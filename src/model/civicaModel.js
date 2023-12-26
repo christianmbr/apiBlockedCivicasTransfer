@@ -3,7 +3,8 @@ import mongoose, { Schema, model } from 'mongoose'
 const CivicaBlackList = new Schema({
   CAR_ID: {
     type: Number,
-    required: true
+    required: true,
+    unique: true
   },
   LRE_STATUS: {
     type: Number,

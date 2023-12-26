@@ -1,6 +1,6 @@
 import express from 'express'
 import databaseConection from './src/db/databaseConection.js'
-// import civicaController from './src/controller/civicaController.js'
+import * as civicaService from './src/service/civicaService.js'
 
 const expressApp = express()
 // Port should be located in env!
@@ -12,5 +12,3 @@ databaseConection.connect()
     .catch(error => console.error(error))
 
 expressApp.listen(PORT, () => { console.log('🚀 Server is running in port: '+ PORT) })
-
-// console.log(await civicaController.isFirstTime())

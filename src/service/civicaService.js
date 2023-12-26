@@ -1,28 +1,26 @@
 import schedule from 'node-schedule'
 import civicaDb from '../db/civicaDb.js'
 
-let version = 29448
-let status = 1
+// let version = 1
 const TIME_CLOCK = 10
 
 const job = schedule.scheduleJob(`*/${TIME_CLOCK} * * * * *`, async () =>{
-    console.log('Buscando actualizaciones................................... version: ', version)
-    const query = `select*from civicas where LRE_VERSAO=${version} and LRE_STATUS=${status}`
-    const isUpdated = await searchUpdates(query)
-    version += 1
-    // if (isUpdated) version = version + 1
+    const versionActual = await searchVersion()
+    console.log('Buscando actualizaciones................................... version: ', versionActual[0]['version'])
+    
+    await searchUpdates(versionActual[0]['version'])
+
+    await updateVersion(versionActual[0]['_id'], versionActual[0]['version'])
 })
 
-async function searchUpdates(query) {
-    return await civicaDb.searchUpdates(query)
+async function searchVersion(){
+    return await civicaDb.searchVersion()
 }
 
-async function insertAll2Mongo(){
-    return await civicaDb.insertAll2Mongo()
+async function updateVersion(id, versionActual){
+    return await civicaDb.updateVersion(id, versionActual)
 }
 
-async function isFirstTime() {
-    return await civicaDb.isFirstTime()
+async function searchUpdates(version) {
+    return await civicaDb.searchUpdates(version)
 }
-
-export default { insertAll2Mongo, isFirstTime }

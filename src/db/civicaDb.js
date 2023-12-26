@@ -1,5 +1,6 @@
 import mariadb from 'mariadb'
 import CivicaModel from '../model/civicaModel.js'
+import VersionModel from '../model/civicaVersion.js'
 
 const pool = mariadb.createPool({
     host: 'localhost',
@@ -8,55 +9,62 @@ const pool = mariadb.createPool({
     database: 'civicas'
 })
 
-async function insertAll2Mongo(){
-    let conn;
-
-    try {
-        conn = await pool.getConnection()
-        const rows = await conn.query('select * from civicas')
-
-        await CivicaModel.insertMany(rows)
-        console.log('Mongo was populated!')
-
-        return true
-    } catch (err) {
-        console.error(err.message)
-        return false
-    }
+async function searchVersion(){
+    return await VersionModel.find({})
 }
 
-async function searchUpdates(query) {
+async function updateVersion(id, versionActual){
+    await VersionModel.updateOne({_id: id}, { $set: { version: versionActual+1 } })
+}
+
+async function searchUpdates(version) {
     let conn
-
+    let rows
+    // const query = `select*from civicas where LRE_VERSAO=${version} and LRE_STATUS=1`
     try {
+        const query = `select*from civicas where LRE_VERSAO=${version}`
         conn = await pool.getConnection()
-        const rows = await conn.query(query)
-        
-        if(rows.length !=0) {
-            console.log('updating mongod')
-            console.log(rows, '\n')
+        rows = await conn.query(query)
+        if (conn) await conn.end()        
+    } catch(err) {
+        console.log(err.message)
+    }
 
-            // Updating in mongod.
-            await CivicaModel.insertMany(rows)
-            return true
-        } else {
-            console.log('Nothing to update')
-            return false
-        }
-    } catch (err) {
-        console.error(err.message)
-        return false
+    // console.log(rows)
+
+    // Search for blocked ids.
+    const blockedId = []
+    const unblockedId = []
+    if(rows.length !=0) {
+        rows.map(id => {
+            if (id['LRE_STATUS'] === 1 || id['LRE_STATUS'] === 3) blockedId.push(id)
+            else unblockedId.push(id)
+        })
+        console.log({ blockedId, unblockedId })
+    } else {
+        console.log('Nothing to updathe in this version')
+    }
+
+    // Insert.
+    try {
+        blockedId.map(async (document) => {
+            await CivicaModel.updateOne(
+                { CAR_ID: document.CAR_ID },
+                { $set: document },
+                { upsert: true }
+            )
+        })
+    } catch(err) {
+        console.log(err.message)
+    }
+    
+    // Delete.
+    try {
+        const deleteId = await CivicaModel.deleteMany({ CAR_ID: { $in: unblockedId.map(id => id.CAR_ID) } })
+        // console.log('Se eliminaron:', deleteId['deletedCount'])
+    }catch(err) {
+        console.log(err.message)
     }
 }
 
-async function updateToMongo(rows){
-    await CivicaModel.insertMany(row)
-    return null
-}
-
-async function isFirstTime() {
-    const response = await CivicaModel.findOne({})
-    return response ? true : false
-}
-
-export default { insertAll2Mongo, isFirstTime, searchUpdates }
+export default { searchUpdates, searchVersion, updateVersion }
