@@ -12,4 +12,4 @@ const civicaVersion = new Schema({
   timestamps: true
 })
 
-export default model('versiones', civicaVersion)
+export default model('version', civicaVersion)

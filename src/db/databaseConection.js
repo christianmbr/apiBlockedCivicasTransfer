@@ -1,12 +1,28 @@
 import mongoose from 'mongoose'
+import mariadb from 'mariadb'
+import config from '../../config.js'
+
 // 
-const url = 'mongodb://localhost:27017'
+const url = config['mongoURL']
+const pool = mariadb.createPool(config['mariaDBCredentials'])
 
 function connect() {
-    return mongoose.connect(url, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    })
+    return mongoose.connect(url, config['mongoConnectOptions'])
 }
 
-export default { connect }
+async function mariadbSearchQuery(query) {
+    let conn
+    let rows
+
+    try {
+        conn = await pool.getConnection()
+        rows = await conn.query(query)
+        if (conn) await conn.end()    
+        
+        return rows
+    } catch(err) {
+        console.log(err.message)
+    }
+}
+
+export default { connect, mariadbSearchQuery }

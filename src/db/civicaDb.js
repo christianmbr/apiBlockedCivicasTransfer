@@ -1,51 +1,78 @@
-import mariadb from 'mariadb'
 import CivicaModel from '../model/civicaModel.js'
 import VersionModel from '../model/civicaVersion.js'
+import databaseConection from './databaseConection.js'
+import config from '../../config.js'
 
-const pool = mariadb.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: '1234567',
-    database: 'civicas'
-})
+async function getStartApi(){
+    try {
+        const response = await VersionModel.findOne({})
+        if(!response) {
+            const newVersion = new VersionModel({ 
+                version: config['versionStartIn']
+            })
+            await newVersion.save()
+            return true
+        }
+    } catch (err) {
+        console.log(err.message)
+    }
+}
 
 async function searchVersion(){
-    return await VersionModel.find({})
+    try {
+        return await VersionModel.find({})
+    } catch (err) {
+        console.log(err.message)
+    }
 }
 
 async function updateVersion(id, versionActual){
-    await VersionModel.updateOne({_id: id}, { $set: { version: versionActual+1 } })
+    try{
+        await VersionModel.updateOne({_id: id}, { $set: { version: versionActual+1 } })
+    } catch (err) {
+        console.log(err.message)
+    }
 }
 
 async function searchUpdates(version) {
-    let conn
-    let rows
-    // const query = `select*from civicas where LRE_VERSAO=${version} and LRE_STATUS=1`
     try {
         const query = `select*from civicas where LRE_VERSAO=${version}`
-        conn = await pool.getConnection()
-        rows = await conn.query(query)
-        if (conn) await conn.end()        
-    } catch(err) {
+        const rows = await databaseConection.mariadbSearchQuery(query)
+        
+        const id = prepareBlockedNUnblockedId(rows)
+        
+        // Insert.
+        if(id['blockedId']){
+            await insertBlockedId(id['blockedId'])
+        }
+        
+        // Delete.
+        if(id['unblockedId']){
+            await unblockId(id['unblockedId'])
+        }
+    } catch (err) {
         console.log(err.message)
     }
+}
 
-    // console.log(rows)
-
-    // Search for blocked ids.
+function prepareBlockedNUnblockedId(rows){
     const blockedId = []
     const unblockedId = []
+
     if(rows.length !=0) {
         rows.map(id => {
             if (id['LRE_STATUS'] === 1 || id['LRE_STATUS'] === 3) blockedId.push(id)
             else unblockedId.push(id)
         })
         console.log({ blockedId, unblockedId })
+        return { blockedId, unblockedId }
     } else {
         console.log('Nothing to updathe in this version')
+        return {}
     }
+}
 
-    // Insert.
+async function insertBlockedId(blockedId){
     try {
         blockedId.map(async (document) => {
             await CivicaModel.updateOne(
@@ -57,14 +84,14 @@ async function searchUpdates(version) {
     } catch(err) {
         console.log(err.message)
     }
-    
-    // Delete.
+}
+
+async function unblockId(unblockedId) {
     try {
-        const deleteId = await CivicaModel.deleteMany({ CAR_ID: { $in: unblockedId.map(id => id.CAR_ID) } })
-        // console.log('Se eliminaron:', deleteId['deletedCount'])
+        await CivicaModel.deleteMany({ CAR_ID: { $in: unblockedId.map(id => id.CAR_ID) } })
     }catch(err) {
         console.log(err.message)
     }
 }
 
-export default { searchUpdates, searchVersion, updateVersion }
+export default { searchUpdates, searchVersion, updateVersion, getStartApi }
